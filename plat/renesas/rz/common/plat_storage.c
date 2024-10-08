@@ -177,6 +177,7 @@ static int32_t open_sddrv(const uintptr_t spec)
 	return io_dev_init(sddrv_dev_handle, 0);
 }
 
+#define MAX_BOOTCHECK  4
 
 void rz_io_setup(void)
 {
@@ -186,6 +187,7 @@ void rz_io_setup(void)
 	const io_dev_connector_t *sd;
 	
 	uint32_t stat_md_boot;
+	int bootcheck_cnt=0;
 
 	boot_io_drv_id = FIP_IMAGE_ID;
 
@@ -223,15 +225,27 @@ void rz_io_setup(void)
 	}
 	else if (stat_md_boot == BOOT_MODE_EMMC_1_8 ||
 	stat_md_boot == BOOT_MODE_EMMC_3_3) {
-		if (emmc_init() != EMMC_SUCCESS) {
-			NOTICE("BL2: Failed to eMMC driver initialize.\n");
-			panic();
-		}
-		emmc_memcard_power(EMMC_POWER_ON);
-		if (emmc_mount() != EMMC_SUCCESS) {
-			NOTICE("BL2: Failed to eMMC mount operation.\n");
-			panic();
-		}
+
+		for(bootcheck_cnt=0;bootcheck_cnt<=MAX_BOOTCHECK;bootcheck_cnt++){
+
+                        if (emmc_init() != EMMC_SUCCESS) {
+                                NOTICE("BL2: eMMC driver initialize %d .\n",bootcheck_cnt);
+                                continue;
+                        }
+
+                        emmc_memcard_power(EMMC_POWER_ON);
+                        if (emmc_mount() != EMMC_SUCCESS) {
+                                NOTICE("BL2: eMMC mount operation %d .\n",bootcheck_cnt);
+                        }else{
+                                break;
+                        }
+
+                        if(bootcheck_cnt>=MAX_BOOTCHECK){
+                                NOTICE("BL2: Failed to eMMC mount operation.\n");
+                                panic();
+                        }
+
+                }
 
 		register_io_dev_emmcdrv(&emmc);
 		io_dev_open(emmc, 0, &emmcdrv_dev_handle);
